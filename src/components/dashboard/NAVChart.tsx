@@ -1,0 +1,120 @@
+'use client';
+
+import { useMemo } from 'react';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
+import { MonthSnapshot } from '@/lib/types';
+import { formatNaira, getMonthName } from '@/lib/calculations';
+
+interface NAVChartProps {
+  snapshots: MonthSnapshot[];
+  startDate: Date;
+}
+
+export function NAVChart({ snapshots, startDate }: NAVChartProps) {
+  const data = useMemo(() => {
+    return snapshots.map((snapshot) => ({
+      month: getMonthName(snapshot.month, startDate),
+      nav: snapshot.nav,
+      moneyMarket: snapshot.moneyMarketValue,
+      land: snapshot.landValue,
+    }));
+  }, [snapshots, startDate]);
+
+  if (data.length === 0) {
+    return (
+      <div className="card p-6 h-80 flex items-center justify-center">
+        <p className="text-(--color-text-muted)">No data yet. Advance the simulation to see NAV growth.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card p-6">
+      <h3 className="text-lg font-semibold text-(--color-text) mb-4">NAV Over Time</h3>
+      <div className="h-72">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="navGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#00D9A5" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#00D9A5" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="mmGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="landGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#F5A623" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#F5A623" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#234567" />
+            <XAxis
+              dataKey="month"
+              tick={{ fill: '#94A3B8', fontSize: 12 }}
+              axisLine={{ stroke: '#234567' }}
+              tickLine={{ stroke: '#234567' }}
+            />
+            <YAxis
+              tick={{ fill: '#94A3B8', fontSize: 12 }}
+              axisLine={{ stroke: '#234567' }}
+              tickLine={{ stroke: '#234567' }}
+              tickFormatter={(value) => `₦${(value / 1_000_000).toFixed(0)}M`}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: '#0F2942',
+                border: '1px solid #234567',
+                borderRadius: '8px',
+                color: '#F8FAFC',
+              }}
+              formatter={(value: number, name: string) => [
+                formatNaira(value),
+                name === 'nav' ? 'Total NAV' : name === 'moneyMarket' ? 'Money Market' : 'Land Assets',
+              ]}
+              labelStyle={{ color: '#94A3B8' }}
+            />
+            <Legend
+              wrapperStyle={{ paddingTop: '20px' }}
+              formatter={(value) =>
+                value === 'nav' ? 'Total NAV' : value === 'moneyMarket' ? 'Money Market' : 'Land Assets'
+              }
+            />
+            <Area
+              type="monotone"
+              dataKey="nav"
+              stroke="#00D9A5"
+              strokeWidth={2}
+              fill="url(#navGradient)"
+            />
+            <Area
+              type="monotone"
+              dataKey="moneyMarket"
+              stroke="#3B82F6"
+              strokeWidth={2}
+              fill="url(#mmGradient)"
+            />
+            <Area
+              type="monotone"
+              dataKey="land"
+              stroke="#F5A623"
+              strokeWidth={2}
+              fill="url(#landGradient)"
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+
