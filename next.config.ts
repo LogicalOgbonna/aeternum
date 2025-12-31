@@ -6,8 +6,8 @@ const nextConfig: NextConfig = {
   // Enable static export for GitHub Pages
   output: 'export',
   
-  // Set base path for GitHub Pages (change 'fund' to your repo name)
-  basePath: isProd ? '/fund' : '',
+  // Set base path for GitHub Pages (must match your repo name)
+  basePath: isProd ? '/aeternum' : '',
   
   // Disable image optimization for static export
   images: {
