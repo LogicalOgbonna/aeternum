@@ -1,21 +1,23 @@
 import type { NextConfig } from "next";
 
-const isProd = process.env.NODE_ENV === 'production';
+// Detect if we're building for GitHub Pages (set in GitHub Actions workflow)
+const isGitHubPages = process.env.DEPLOY_TARGET === 'github-pages';
 
 const nextConfig: NextConfig = {
-  // Enable static export for GitHub Pages
-  output: 'export',
+  // Only use static export for GitHub Pages
+  ...(isGitHubPages && { output: 'export' }),
   
-  // Set base path for GitHub Pages (must match your repo name)
-  basePath: isProd ? '/aeternum' : '',
-  
-  // Disable image optimization for static export
-  images: {
-    unoptimized: true,
-  },
+  // Set base path only for GitHub Pages (must match your repo name)
+  ...(isGitHubPages && { basePath: '/aeternum' }),
   
   // Trailing slashes help with GitHub Pages routing
-  trailingSlash: true,
+  ...(isGitHubPages && { trailingSlash: true }),
+  
+  // Disable image optimization for static export (GitHub Pages)
+  // Vercel handles this automatically
+  images: {
+    unoptimized: isGitHubPages,
+  },
 };
 
 export default nextConfig;
