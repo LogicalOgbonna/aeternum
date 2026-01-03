@@ -50,14 +50,14 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-(--color-text)">Dashboard</h1>
-          <p className="text-(--color-text-secondary) mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-(--color-text)">Dashboard</h1>
+          <p className="text-sm sm:text-base text-(--color-text-secondary) mt-1">
             Overview of {store.fundName}
           </p>
         </div>
-        <Link href="/simulation" className="btn-primary flex items-center gap-2">
+        <Link href="/simulation" className="btn-primary flex items-center justify-center gap-2 text-sm sm:text-base w-full sm:w-auto">
           <PlayCircle className="w-4 h-4" />
           Run Simulation
           <ChevronRight className="w-4 h-4" />

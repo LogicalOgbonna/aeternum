@@ -49,15 +49,15 @@ export function StatCard({
   return (
     <div
       className={clsx(
-        'card p-5 transition-all duration-300 hover:scale-[1.02]',
+        'card p-4 sm:p-5 transition-all duration-300 hover:scale-[1.02]',
         variantStyles[variant],
         className
       )}
     >
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between mb-3 sm:mb-4">
         <div
           className={clsx(
-            'w-10 h-10 rounded-lg flex items-center justify-center',
+            'w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center',
             iconBgStyles[variant]
           )}
         >
@@ -66,7 +66,7 @@ export function StatCard({
         {trend && (
           <div
             className={clsx(
-              'flex items-center gap-1 text-sm font-medium',
+              'flex items-center gap-1 text-xs sm:text-sm font-medium',
               trend.value >= 0 ? 'text-(--color-success)' : 'text-(--color-danger)'
             )}
           >
@@ -76,13 +76,11 @@ export function StatCard({
         )}
       </div>
 
-      <p className="text-sm text-(--color-text-secondary) mb-1">{title}</p>
-      <p className="text-2xl font-bold text-(--color-text) mono">{value}</p>
+      <p className="text-xs sm:text-sm text-(--color-text-secondary) mb-1">{title}</p>
+      <p className="text-lg sm:text-2xl font-bold text-(--color-text) mono truncate">{value}</p>
       {subtitle && (
-        <p className="text-xs text-(--color-text-muted) mt-1">{subtitle}</p>
+        <p className="text-xs text-(--color-text-muted) mt-1 truncate">{subtitle}</p>
       )}
     </div>
   );
 }
-
-

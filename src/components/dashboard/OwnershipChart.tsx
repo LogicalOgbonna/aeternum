@@ -48,24 +48,24 @@ export function OwnershipChart({ members, balances }: OwnershipChartProps) {
 
   if (data.length === 0) {
     return (
-      <div className="card p-6 h-80 flex items-center justify-center">
-        <p className="text-(--color-text-muted)">No ownership data yet.</p>
+      <div className="card p-4 sm:p-6 h-64 sm:h-80 flex items-center justify-center">
+        <p className="text-(--color-text-muted) text-sm sm:text-base">No ownership data yet.</p>
       </div>
     );
   }
 
   return (
-    <div className="card p-6">
-      <h3 className="text-lg font-semibold text-(--color-text) mb-4">Ordinary Shares Distribution</h3>
-      <div className="h-72">
+    <div className="card p-4 sm:p-6">
+      <h3 className="text-base sm:text-lg font-semibold text-(--color-text) mb-4">Ordinary Shares Distribution</h3>
+      <div className="h-56 sm:h-72">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius={60}
-              outerRadius={90}
+              innerRadius={40}
+              outerRadius={70}
               paddingAngle={2}
               dataKey="value"
               label={({ name, value }) => `${name?.split(' ')[0]} ${value.toFixed(1)}%`}
@@ -85,6 +85,7 @@ export function OwnershipChart({ members, balances }: OwnershipChartProps) {
                 border: '1px solid #234567',
                 borderRadius: '8px',
                 color: '#F8FAFC',
+                fontSize: '12px',
               }}
               formatter={(value: number, name: string, props: { payload?: { currentValue: number; units: number } }) => [
                 <span key="value">
@@ -96,8 +97,21 @@ export function OwnershipChart({ members, balances }: OwnershipChartProps) {
           </PieChart>
         </ResponsiveContainer>
       </div>
+      
+      {/* Mobile Legend */}
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:hidden">
+        {data.slice(0, 6).map((entry, index) => (
+          <div key={entry.name} className="flex items-center gap-2">
+            <div 
+              className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
+              style={{ backgroundColor: COLORS[index % COLORS.length] }}
+            />
+            <span className="text-xs text-(--color-text-secondary) truncate">
+              {entry.name?.split(' ')[0]} ({entry.value.toFixed(1)}%)
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
-
-
