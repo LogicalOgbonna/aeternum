@@ -6,12 +6,12 @@ import clsx from 'clsx';
 import {
   BookOpen,
   Scale,
-  Users,
+  // Users,
   Coins,
-  MapPin,
-  Calculator,
+  // MapPin,
+  // Calculator,
   Shield,
-  FileText,
+  // FileText,
   HelpCircle,
   X,
 } from 'lucide-react';
@@ -28,23 +28,23 @@ const sections = [
     title: 'Constitution',
     items: [
       { name: 'Fund Structure', href: '/docs/fund-structure', icon: Scale },
-      { name: 'Membership', href: '/docs/membership', icon: Users },
+      // { name: 'Membership', href: '/docs/membership', icon: Users },
       { name: 'Contributions', href: '/docs/contributions', icon: Coins },
     ],
   },
-  {
-    title: 'Operations',
-    items: [
-      { name: 'Land Acquisition', href: '/docs/land-acquisition', icon: MapPin },
-      { name: 'NAV Calculation', href: '/docs/nav-calculation', icon: Calculator },
-      { name: 'Distributions', href: '/docs/distributions', icon: FileText },
-    ],
-  },
+  // {
+  //   title: 'Operations',
+  //   items: [
+  //     { name: 'Land Acquisition', href: '/docs/land-acquisition', icon: MapPin },
+  //     { name: 'NAV Calculation', href: '/docs/nav-calculation', icon: Calculator },
+  //     { name: 'Distributions', href: '/docs/distributions', icon: FileText },
+  //   ],
+  // },
   {
     title: 'Governance',
     items: [
       { name: 'Rules & Policies', href: '/docs/rules', icon: Shield },
-      { name: 'Amendments', href: '/docs/amendments', icon: FileText },
+      // { name: 'Amendments', href: '/docs/amendments', icon: FileText },
     ],
   },
 ];
