@@ -9,6 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@statsig/react-bindings": "^3.31.1",
+    "@statsig/session-replay": "^3.31.1",
+    "@statsig/web-analytics": "^3.31.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.561.0",

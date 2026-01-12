@@ -584,7 +584,8 @@ export function exitMember(
 export function exitMemberCompanyBuyback(
   state: FundState,
   memberId: string,
-  reason: 'voluntary' | 'default' | 'death' | 'forced'
+  reason: 'voluntary' | 'default' | 'death' | 'forced',
+  allocations: { memberId: string; percentage: number }[] // Custom buyback allocations
 ): FundState {
   const member = state.members.find(m => m.id === memberId);
   if (!member) return state;
@@ -592,28 +593,37 @@ export function exitMemberCompanyBuyback(
   const memberUnits = getMemberUnits(state, memberId);
   const exitValue = memberUnits * state.unitPrice;
   
-  // Get remaining active members (excluding the exiting member)
-  const remainingActiveMembers = state.members.filter(m => m.isActive && m.id !== memberId);
-  if (remainingActiveMembers.length === 0) {
-    // No remaining members to buy back, fall back to fund payout
+  // Validate allocations - must total 100%
+  const totalPercentage = allocations.reduce((sum, a) => sum + a.percentage, 0);
+  if (Math.abs(totalPercentage - 100) > 0.01) {
+    // Allocations don't total 100%, return unchanged state
+    return state;
+  }
+  
+  // Filter out zero allocations and validate buying members
+  const validAllocations = allocations.filter(a => {
+    const buyingMember = state.members.find(m => m.id === a.memberId);
+    return a.percentage > 0 && buyingMember && buyingMember.isActive && a.memberId !== memberId;
+  });
+  
+  if (validAllocations.length === 0) {
+    // No valid allocations, fall back to fund payout
     return exitMember(state, memberId, reason);
   }
   
-  // Calculate units distributed to each remaining member (equal distribution)
-  const unitsPerMember = memberUnits / remainingActiveMembers.length;
-  
-  // Calculate cost per member (equal contribution to pay the exiting member)
-  const costPerMember = exitValue / remainingActiveMembers.length;
-  
-  // Create contribution records for the buyback (members buying shares)
-  const buybackContributions: Contribution[] = remainingActiveMembers.map(m => ({
-    memberId: m.id,
-    month: state.currentMonth,
-    amount: costPerMember,
-    unitsIssued: unitsPerMember,
-    unitPrice: state.unitPrice,
-    timestamp: new Date(),
-  }));
+  // Create contribution records for the buyback based on allocations
+  const buybackContributions: Contribution[] = validAllocations.map(allocation => {
+    const unitsForMember = memberUnits * (allocation.percentage / 100);
+    const costForMember = exitValue * (allocation.percentage / 100);
+    return {
+      memberId: allocation.memberId,
+      month: state.currentMonth,
+      amount: costForMember,
+      unitsIssued: unitsForMember,
+      unitPrice: state.unitPrice,
+      timestamp: new Date(),
+    };
+  });
   
   // Mark exiting member as inactive
   const updatedMembers = state.members.map(m =>
@@ -626,11 +636,17 @@ export function exitMemberCompanyBuyback(
   // NAV remains the same (members pay each other, money stays internal)
   // Unit price remains the same
   
+  // Build description with buyer details
+  const buyerDetails = validAllocations.map(a => {
+    const buyingMember = state.members.find(m => m.id === a.memberId);
+    return `${buyingMember?.name} (${a.percentage}%)`;
+  }).join(', ');
+  
   const event: SimulationEvent = {
     id: `event-${Date.now()}`,
     month: state.currentMonth,
     type: 'shares_buyback',
-    description: `Company Buyback: ${member.name}'s ${formatNumber(memberUnits, 2)} units distributed equally to ${remainingActiveMembers.length} members for ${formatNaira(exitValue)}`,
+    description: `Company Buyback: ${member.name}'s ${formatNumber(memberUnits, 2)} units bought by ${buyerDetails} for ${formatNaira(exitValue)}`,
     details: { 
       memberId,
       memberName: member.name,
@@ -638,10 +654,17 @@ export function exitMemberCompanyBuyback(
       exitMethod: 'company_buyback',
       unitsRedeemed: memberUnits,
       exitValue,
-      unitsPerMember,
-      costPerMember,
-      buyersCount: remainingActiveMembers.length,
-      buyers: remainingActiveMembers.map(m => ({ id: m.id, name: m.name })),
+      allocations: validAllocations,
+      buyers: validAllocations.map(a => {
+        const buyingMember = state.members.find(m => m.id === a.memberId);
+        return { 
+          id: a.memberId, 
+          name: buyingMember?.name || '', 
+          percentage: a.percentage,
+          units: memberUnits * (a.percentage / 100),
+          cost: exitValue * (a.percentage / 100),
+        };
+      }),
     },
     timestamp: new Date(),
   };
@@ -650,78 +673,6 @@ export function exitMemberCompanyBuyback(
     ...state,
     members: updatedMembers,
     contributions: [...state.contributions, ...buybackContributions],
-    events: [...state.events, event],
-  };
-}
-
-// Individual buyback - a specific member buys all shares of the exiting member
-export function exitMemberIndividualBuyback(
-  state: FundState,
-  exitingMemberId: string,
-  buyingMemberId: string,
-  reason: 'voluntary' | 'default' | 'death' | 'forced'
-): FundState {
-  const exitingMember = state.members.find(m => m.id === exitingMemberId);
-  const buyingMember = state.members.find(m => m.id === buyingMemberId);
-  
-  if (!exitingMember || !buyingMember) return state;
-  if (!buyingMember.isActive) return state;
-  if (exitingMemberId === buyingMemberId) return state;
-  
-  const memberUnits = getMemberUnits(state, exitingMemberId);
-  const exitValue = memberUnits * state.unitPrice;
-  
-  // Create contribution record for the buying member
-  const buybackContribution: Contribution = {
-    memberId: buyingMemberId,
-    month: state.currentMonth,
-    amount: exitValue,
-    unitsIssued: memberUnits,
-    unitPrice: state.unitPrice,
-    timestamp: new Date(),
-  };
-  
-  // Mark exiting member as inactive with reference to buyer
-  const updatedMembers = state.members.map(m =>
-    m.id === exitingMemberId
-      ? { 
-          ...m, 
-          isActive: false, 
-          exitedMonth: state.currentMonth, 
-          exitReason: reason, 
-          exitMethod: 'individual_buyback' as const,
-          boughtByMemberId: buyingMemberId,
-        }
-      : m
-  );
-  
-  // Total units remain the same (transferred, not redeemed)
-  // NAV remains the same (internal transfer)
-  // Unit price remains the same
-  
-  const event: SimulationEvent = {
-    id: `event-${Date.now()}`,
-    month: state.currentMonth,
-    type: 'shares_buyback',
-    description: `Individual Buyback: ${buyingMember.name} bought ${formatNumber(memberUnits, 2)} units from ${exitingMember.name} for ${formatNaira(exitValue)}`,
-    details: { 
-      exitingMemberId,
-      exitingMemberName: exitingMember.name,
-      buyingMemberId,
-      buyingMemberName: buyingMember.name,
-      reason,
-      exitMethod: 'individual_buyback',
-      unitsTransferred: memberUnits,
-      transferValue: exitValue,
-      unitPriceAtTransfer: state.unitPrice,
-    },
-    timestamp: new Date(),
-  };
-  
-  return {
-    ...state,
-    members: updatedMembers,
-    contributions: [...state.contributions, buybackContribution],
     events: [...state.events, event],
   };
 }

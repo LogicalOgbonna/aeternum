@@ -2,7 +2,12 @@
 
 export type MemberProfile = 'consistent' | 'variable' | 'irregular' | 'quarterly' | 'lumpy';
 
-export type ExitMethod = 'fund_payout' | 'company_buyback' | 'individual_buyback';
+export type ExitMethod = 'fund_payout' | 'company_buyback';
+
+export interface BuybackAllocation {
+  memberId: string;
+  percentage: number; // Percentage of the exiting member's shares to buy (0-100)
+}
 
 export interface Member {
   id: string;
@@ -15,7 +20,6 @@ export interface Member {
   exitedMonth?: number;
   exitReason?: 'voluntary' | 'default' | 'death' | 'forced';
   exitMethod?: ExitMethod;
-  boughtByMemberId?: string; // For individual buyback - who bought the shares
 }
 
 export interface Contribution {
@@ -220,3 +224,53 @@ export interface ExpenseRecord {
   timestamp: Date;
 }
 
+// Lending types
+export type LoanStatus = 'active' | 'paid' | 'defaulted' | 'cancelled';
+export type LoanType = 'unsecured' | 'secured'; // unsecured = no collateral, secured = with collateral
+
+export interface Collateral {
+  type: 'land' | 'investment' | 'shares' | 'other';
+  description: string;
+  estimatedValue: number;
+  assetId?: string;            // Reference to LandAsset or InvestmentVehicle if applicable
+}
+
+export interface Loan {
+  id: string;
+  borrowerMemberId: string;
+  borrowerName: string;
+  principal: number;           // Original loan amount
+  interestRate: number;        // Annual interest rate (e.g., 0.15 for 15%)
+  totalDue: number;            // Principal + interest
+  amountPaid: number;          // Amount already paid
+  startDate: Date;             // When loan was issued
+  dueDate: Date;               // When loan is due
+  status: LoanStatus;
+  payments: LoanPayment[];
+  notes?: string;
+  // Collateral fields
+  loanType: LoanType;          // 'unsecured' (≤50% balance) or 'secured' (>50% balance)
+  borrowerBalanceAtLoan: number; // Member's balance when loan was created
+  loanToBalanceRatio: number;  // principal / borrowerBalance (0-1+)
+  collateral?: Collateral;     // Required when loanType is 'secured'
+}
+
+export interface LoanPayment {
+  id: string;
+  loanId: string;
+  amount: number;
+  paymentDate: Date;
+  confirmedBy?: string;        // Who confirmed the payment
+  notes?: string;
+}
+
+export interface LendingSettings {
+  // Interest rates
+  unsecuredInterestRate: number;  // Lower rate for loans ≤50% of balance (no collateral)
+  securedInterestRate: number;    // Higher rate for loans >50% of balance (with collateral)
+  // Loan terms
+  defaultLoanTermMonths: number;  // Default loan term in months
+  // Thresholds
+  collateralThreshold: number;    // Percentage threshold (e.g., 0.5 = 50%) above which collateral is required
+  maxLoanPercentage: number;      // Max loan as percentage of member's balance (e.g., 1.0 = 100%)
+}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import StatsigProvider from '@/providers/statsig';
 
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
@@ -27,7 +28,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${dmSans.variable} ${jetBrainsMono.variable} antialiased`}>
-        {children}
+        <StatsigProvider>
+          {children}
+        </StatsigProvider>
       </body>
     </html>
   );

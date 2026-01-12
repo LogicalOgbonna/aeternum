@@ -390,15 +390,19 @@ function AddMemberModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-type ExitMethodType = 'fund_payout' | 'company_buyback' | 'individual_buyback';
+type ExitMethodType = 'fund_payout' | 'company_buyback';
+
+interface BuybackAllocationState {
+  memberId: string;
+  percentage: number;
+}
 
 function ExitMemberModal({ member, onClose }: { member: Member; onClose: () => void }) {
   const store = useFundStore();
-  const { removeMember, removeMemberCompanyBuyback, removeMemberIndividualBuyback } = store;
+  const { removeMember, removeMemberCompanyBuyback } = store;
   const [reason, setReason] = useState<'voluntary' | 'default' | 'death' | 'forced'>('voluntary');
   const [exitMethod, setExitMethod] = useState<ExitMethodType>('fund_payout');
-  const [buyingMemberId, setBuyingMemberId] = useState<string>('');
-
+  
   // Calculate exit value
   const balances = getMemberBalances(store);
   const memberBalance = balances.find(b => b.memberId === member.id);
@@ -409,8 +413,28 @@ function ExitMemberModal({ member, onClose }: { member: Member; onClose: () => v
   
   // Get other active members for buyback options
   const otherActiveMembers = store.members.filter(m => m.isActive && m.id !== member.id);
-  const costPerMemberCompanyBuyback = otherActiveMembers.length > 0 ? exitValue / otherActiveMembers.length : 0;
-  const unitsPerMemberCompanyBuyback = otherActiveMembers.length > 0 ? memberUnits / otherActiveMembers.length : 0;
+  
+  // Buyback allocations state - initialize with empty allocations
+  const [buybackAllocations, setBuybackAllocations] = useState<BuybackAllocationState[]>(
+    otherActiveMembers.map(m => ({ memberId: m.id, percentage: 0 }))
+  );
+  
+  // Calculate total allocated percentage
+  const totalAllocatedPercentage = buybackAllocations.reduce((sum, a) => sum + a.percentage, 0);
+  const isAllocationValid = Math.abs(totalAllocatedPercentage - 100) < 0.01;
+  
+  // Update allocation for a specific member
+  const updateAllocation = (memberId: string, percentage: number) => {
+    setBuybackAllocations(prev => 
+      prev.map(a => a.memberId === memberId ? { ...a, percentage: Math.max(0, Math.min(100, percentage)) } : a)
+    );
+  };
+  
+  // Distribute remaining percentage equally among selected members
+  const distributeEqually = () => {
+    const equalShare = 100 / otherActiveMembers.length;
+    setBuybackAllocations(otherActiveMembers.map(m => ({ memberId: m.id, percentage: equalShare })));
+  };
 
   const handleExit = () => {
     switch (exitMethod) {
@@ -418,18 +442,15 @@ function ExitMemberModal({ member, onClose }: { member: Member; onClose: () => v
         removeMember(member.id, reason);
         break;
       case 'company_buyback':
-        removeMemberCompanyBuyback(member.id, reason);
-        break;
-      case 'individual_buyback':
-        if (buyingMemberId) {
-          removeMemberIndividualBuyback(member.id, buyingMemberId, reason);
-        }
+        // Filter out zero allocations
+        const validAllocations = buybackAllocations.filter(a => a.percentage > 0);
+        removeMemberCompanyBuyback(member.id, reason, validAllocations);
         break;
     }
     onClose();
   };
 
-  const isValidExit = exitMethod !== 'individual_buyback' || buyingMemberId !== '';
+  const isValidExit = exitMethod === 'fund_payout' || (exitMethod === 'company_buyback' && isAllocationValid);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -522,35 +543,7 @@ function ExitMemberModal({ member, onClose }: { member: Member; onClose: () => v
                 <div className="flex-1">
                   <p className="font-medium text-(--color-text)">Company Buyback</p>
                   <p className="text-xs text-(--color-text-muted) mt-1">
-                    Shares distributed equally to {otherActiveMembers.length} remaining members. 
-                    Each pays {formatNaira(costPerMemberCompanyBuyback)} for {formatNumber(unitsPerMemberCompanyBuyback, 2)} units.
-                  </p>
-                </div>
-              </div>
-            </label>
-
-            {/* Individual Buyback */}
-            <label 
-              className={`block p-4 rounded-lg border cursor-pointer transition-colors ${
-                exitMethod === 'individual_buyback' 
-                  ? 'border-(--color-success) bg-(--color-success)/10' 
-                  : 'border-(--color-border) bg-(--color-primary-dark) hover:border-(--color-text-muted)'
-              } ${otherActiveMembers.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <div className="flex items-start gap-3">
-                <input
-                  type="radio"
-                  name="exitMethod"
-                  value="individual_buyback"
-                  checked={exitMethod === 'individual_buyback'}
-                  onChange={() => setExitMethod('individual_buyback')}
-                  disabled={otherActiveMembers.length === 0}
-                  className="mt-1"
-                />
-                <div className="flex-1">
-                  <p className="font-medium text-(--color-text)">Individual Buyback</p>
-                  <p className="text-xs text-(--color-text-muted) mt-1">
-                    A specific member buys all {formatNumber(memberUnits, 2)} units for {formatNaira(exitValue)}.
+                    Shares distributed to remaining members based on their chosen allocation.
                   </p>
                 </div>
               </div>
@@ -558,37 +551,111 @@ function ExitMemberModal({ member, onClose }: { member: Member; onClose: () => v
           </div>
         </div>
 
-        {/* Individual Buyback - Member Selection */}
-        {exitMethod === 'individual_buyback' && (
+        {/* Company Buyback - Member Allocation Selection */}
+        {exitMethod === 'company_buyback' && (
           <div className="mb-4">
-            <label className="block text-sm font-medium text-(--color-text-secondary) mb-2">
-              Select Buying Member
-            </label>
-            <select
-              value={buyingMemberId}
-              onChange={(e) => setBuyingMemberId(e.target.value)}
-              className="select"
-            >
-              <option value="">-- Select a member --</option>
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-medium text-(--color-text-secondary)">
+                Buyback Allocation
+              </label>
+              <button
+                type="button"
+                onClick={distributeEqually}
+                className="text-xs text-(--color-accent) hover:text-(--color-accent)/80 underline"
+              >
+                Distribute Equally
+              </button>
+            </div>
+            
+            {/* Allocation Progress */}
+            <div className="mb-4 p-3 rounded-lg bg-(--color-surface-elevated) border border-(--color-border)">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-(--color-text-secondary)">Total Allocated</span>
+                <span className={`text-sm font-bold mono ${
+                  isAllocationValid ? 'text-(--color-success)' : 'text-(--color-warning)'
+                }`}>
+                  {totalAllocatedPercentage.toFixed(1)}% / 100%
+                </span>
+              </div>
+              <div className="w-full h-2 bg-(--color-primary-dark) rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-300 ${
+                    isAllocationValid ? 'bg-(--color-success)' : totalAllocatedPercentage > 100 ? 'bg-(--color-danger)' : 'bg-(--color-warning)'
+                  }`}
+                  style={{ width: `${Math.min(totalAllocatedPercentage, 100)}%` }}
+                />
+              </div>
+              {!isAllocationValid && (
+                <p className="text-xs text-(--color-warning) mt-2">
+                  {totalAllocatedPercentage < 100 
+                    ? `Allocate ${(100 - totalAllocatedPercentage).toFixed(1)}% more to continue` 
+                    : `Over-allocated by ${(totalAllocatedPercentage - 100).toFixed(1)}%`}
+                </p>
+              )}
+            </div>
+            
+            {/* Member Allocation Inputs */}
+            <div className="space-y-3 max-h-48 overflow-y-auto">
               {otherActiveMembers.map(m => {
                 const mBalance = balances.find(b => b.memberId === m.id);
+                const allocation = buybackAllocations.find(a => a.memberId === m.id);
+                const memberPercentage = allocation?.percentage || 0;
+                const unitsForMember = memberUnits * (memberPercentage / 100);
+                const costForMember = exitValue * (memberPercentage / 100);
+                
                 return (
-                  <option key={m.id} value={m.id}>
-                    {m.name} ({formatNumber(mBalance?.totalUnits || 0, 2)} units, {formatPercentage(mBalance?.ownershipPercentage || 0)} ownership)
-                  </option>
+                  <div 
+                    key={m.id} 
+                    className={`p-3 rounded-lg border transition-colors ${
+                      memberPercentage > 0 
+                        ? 'border-(--color-gold)/50 bg-(--color-gold)/5' 
+                        : 'border-(--color-border) bg-(--color-primary-dark)'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
+                        style={{
+                          backgroundColor: `${profileColors[m.profile]}20`,
+                          color: profileColors[m.profile],
+                        }}
+                      >
+                        {m.name.split(' ').map(n => n[0]).join('')}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-(--color-text) text-sm truncate">{m.name}</p>
+                        <p className="text-xs text-(--color-text-muted)">
+                          Current: {formatNumber(mBalance?.totalUnits || 0, 2)} units ({formatPercentage(mBalance?.ownershipPercentage || 0)})
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={memberPercentage || ''}
+                          onChange={(e) => updateAllocation(m.id, parseFloat(e.target.value) || 0)}
+                          className="w-20 px-2 py-1 text-sm text-right rounded border border-(--color-border) bg-(--color-surface) text-(--color-text) mono"
+                          placeholder="0"
+                        />
+                        <span className="text-sm text-(--color-text-secondary)">%</span>
+                      </div>
+                    </div>
+                    {memberPercentage > 0 && (
+                      <div className="mt-2 pt-2 border-t border-(--color-border) flex justify-between text-xs">
+                        <span className="text-(--color-text-muted)">
+                          Gets: <span className="mono text-(--color-success)">+{formatNumber(unitsForMember, 2)} units</span>
+                        </span>
+                        <span className="text-(--color-text-muted)">
+                          Pays: <span className="mono text-(--color-warning)">{formatNaira(costForMember)}</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
-            </select>
-            {buyingMemberId && (
-              <p className="text-xs text-(--color-text-muted) mt-2">
-                After buyback: {(() => {
-                  const buyerBalance = balances.find(b => b.memberId === buyingMemberId);
-                  const newUnits = (buyerBalance?.totalUnits || 0) + memberUnits;
-                  const newOwnership = newUnits / store.totalUnits;
-                  return `${formatNumber(newUnits, 2)} units (${formatPercentage(newOwnership)} ownership)`;
-                })()}
-              </p>
-            )}
+            </div>
           </div>
         )}
 
@@ -615,29 +682,29 @@ function ExitMemberModal({ member, onClose }: { member: Member; onClose: () => v
                   <span className="mono text-(--color-text)">No change</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-(--color-text-secondary)">Cost Per Member</span>
-                  <span className="mono text-(--color-warning)">{formatNaira(costPerMemberCompanyBuyback)}</span>
+                  <span className="text-(--color-text-secondary)">Total Units</span>
+                  <span className="mono text-(--color-text)">No change (redistributed)</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-(--color-text-secondary)">Units Per Member</span>
-                  <span className="mono text-(--color-success)">+{formatNumber(unitsPerMemberCompanyBuyback, 2)}</span>
-                </div>
-              </>
-            )}
-            {exitMethod === 'individual_buyback' && buyingMemberId && (
-              <>
-                <div className="flex justify-between">
-                  <span className="text-(--color-text-secondary)">Fund Cash Change</span>
-                  <span className="mono text-(--color-text)">No change</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-(--color-text-secondary)">Buyer Pays</span>
-                  <span className="mono text-(--color-warning)">{formatNaira(exitValue)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-(--color-text-secondary)">Buyer Receives</span>
-                  <span className="mono text-(--color-success)">+{formatNumber(memberUnits, 2)} units</span>
-                </div>
+                {buybackAllocations.filter(a => a.percentage > 0).length > 0 && (
+                  <div className="pt-2 border-t border-(--color-border) mt-2">
+                    <p className="text-xs text-(--color-text-muted) mb-2">Buying Members:</p>
+                    {buybackAllocations
+                      .filter(a => a.percentage > 0)
+                      .map(a => {
+                        const buyingMember = otherActiveMembers.find(m => m.id === a.memberId);
+                        const unitsGained = memberUnits * (a.percentage / 100);
+                        const costToPay = exitValue * (a.percentage / 100);
+                        return (
+                          <div key={a.memberId} className="flex justify-between text-xs mb-1">
+                            <span className="text-(--color-text)">{buyingMember?.name} ({a.percentage}%)</span>
+                            <span className="mono text-(--color-text-muted)">
+                              +{formatNumber(unitsGained, 2)} units for {formatNaira(costToPay)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -671,7 +738,6 @@ function ExitMemberModal({ member, onClose }: { member: Member; onClose: () => v
           >
             {exitMethod === 'fund_payout' && `Confirm Exit & Pay ${formatNaira(exitValue)}`}
             {exitMethod === 'company_buyback' && 'Confirm Company Buyback'}
-            {exitMethod === 'individual_buyback' && 'Confirm Individual Buyback'}
           </button>
         </div>
       </div>

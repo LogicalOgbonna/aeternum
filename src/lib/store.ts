@@ -10,7 +10,6 @@ import {
   addMember,
   exitMember,
   exitMemberCompanyBuyback,
-  exitMemberIndividualBuyback,
   purchaseLand,
   sellLand,
   makeInvestment,
@@ -29,8 +28,7 @@ interface FundStore extends FundState {
   // Member actions
   addNewMember: (name: string, profile: MemberProfile, baseContribution: number) => void;
   removeMember: (memberId: string, reason: 'voluntary' | 'default' | 'death' | 'forced') => void;
-  removeMemberCompanyBuyback: (memberId: string, reason: 'voluntary' | 'default' | 'death' | 'forced') => void;
-  removeMemberIndividualBuyback: (exitingMemberId: string, buyingMemberId: string, reason: 'voluntary' | 'default' | 'death' | 'forced') => void;
+  removeMemberCompanyBuyback: (memberId: string, reason: 'voluntary' | 'default' | 'death' | 'forced', allocations: { memberId: string; percentage: number }[]) => void;
   
   // Land actions
   buyLand: (name: string, location: string, price: number, appreciationRate?: number) => void;
@@ -125,17 +123,10 @@ export const useFundStore = create<FundStore>()(
         set(newState);
       },
       
-      // Remove a member (company buyback - shares distributed equally to remaining members)
-      removeMemberCompanyBuyback: (memberId: string, reason: 'voluntary' | 'default' | 'death' | 'forced') => {
+      // Remove a member (company buyback - shares distributed to selected members based on their allocations)
+      removeMemberCompanyBuyback: (memberId: string, reason: 'voluntary' | 'default' | 'death' | 'forced', allocations: { memberId: string; percentage: number }[]) => {
         const currentState = get();
-        const newState = exitMemberCompanyBuyback(currentState, memberId, reason);
-        set(newState);
-      },
-      
-      // Remove a member (individual buyback - specific member buys all shares)
-      removeMemberIndividualBuyback: (exitingMemberId: string, buyingMemberId: string, reason: 'voluntary' | 'default' | 'death' | 'forced') => {
-        const currentState = get();
-        const newState = exitMemberIndividualBuyback(currentState, exitingMemberId, buyingMemberId, reason);
+        const newState = exitMemberCompanyBuyback(currentState, memberId, reason, allocations);
         set(newState);
       },
       
